@@ -43,6 +43,7 @@
 #define MUX_S3 26
 
 #define MUX_ENABLE 3
+#define MUX_OUT 4
 
 //Trig outputs
 #define TRIG_NOTE1  32
@@ -206,6 +207,7 @@ void setup()
   pinMode(ENC_BTN, INPUT_PULLUP);
   pinMode(UNISON_ON, INPUT_PULLUP);
   pinMode(AUTOTUNE, INPUT_PULLUP);
+  pinMode(MUX_OUT, INPUT);
   pinMode(MUX_ENABLE, OUTPUT);
 
   digitalWrite(GATE_NOTE1, LOW);
@@ -227,7 +229,7 @@ void setup()
   digitalWrite(MUX_S1, LOW);
   digitalWrite(MUX_S2, LOW);
   digitalWrite(MUX_S3, LOW);
-  digitalWrite(MUX_ENABLE, HIGH);
+  digitalWrite(MUX_ENABLE, LOW);
 
   SPI.setDataMode(SPI_MODE1);
   SPI.begin();
@@ -322,8 +324,10 @@ void setup()
   encButton.attach(ENC_BTN);
   encButton.interval(5);  // interval in ms
 
-  //  setVoltage(PITCH_DAC, PITCH_AB, 1, 1023); // DAC7, channel 0, gain = 1X
-  //  setVoltage(CC_DAC, CC_AB, 1, 0); // DAC7, channel 1, gain = 1X
+  sample_data = ((channel_h & 0xFFF0000F) | ( 13180 & 0xFFFF) << 4);
+  outputDAC(DAC_NOTE3, sample_data);
+  sample_data = ((channel_g & 0xFFF0000F) | ( 0 & 0xFFFF) << 4);
+  outputDAC(DAC_NOTE3, sample_data);
 
   menu = SETTINGS;
   updateSelection();
@@ -332,16 +336,22 @@ void setup()
 void myPitchBend(byte channel, int bend) {
   if ((MIDI.getChannel() == pitchBendChan) || (pitchBendChan == 0 )) {
     d2 = MIDI.getData2(); // d2 from 0 to 127, mid point = 64
-    sample_data = (channel_h & 0xFFF0000F) | (((int(bend * 1.605)+ 13180) & 0xFFFF) << 4);
+    sample_data = (channel_h & 0xFFF0000F) | (((int(bend * 1.605) + 13180) & 0xFFFF) << 4);
     outputDAC(DAC_NOTE3, sample_data);
   }
 }
 
 void myControlChange(byte channel, byte number, byte value) {
   if ((MIDI.getChannel() == ccChan || ccChan == 0)) {
-    d2 = MIDI.getData2();
-    sample_data = (channel_g & 0xFFF0000F) | (((int(value * 207)) & 0xFFFF) << 4);
-    outputDAC(DAC_NOTE3, sample_data);
+    if ( number == 1 )
+    {
+      sample_data = (channel_g & 0xFFF0000F) | (((int(value * 207)) & 0xFFFF) << 4);
+      outputDAC(DAC_NOTE3, sample_data);
+    }
+    else
+    {
+      MIDI.sendControlChange(number, value, channel);
+    }
   }
 }
 
